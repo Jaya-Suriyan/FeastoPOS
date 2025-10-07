@@ -9,7 +9,11 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { fetchLiveOrders } from '../services/ordersService';
+import {
+  fetchLiveOrders,
+  fetchOrderById,
+  fetchOrdersByDate,
+} from '../services/ordersService';
 import { useAuth } from '../context/AuthContext';
 
 type Order = {
@@ -35,6 +39,8 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -47,8 +53,14 @@ export default function LiveOrdersScreen({ onBack }: Props) {
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
         const dateStr = `${yyyy}-${mm}-${dd}`;
+        const statusParam =
+          tab === 'new'
+            ? 'pending'
+            : tab === 'in-progress'
+            ? 'processing'
+            : 'completed';
         const apiOrders = await fetchLiveOrders({
-          status: 'pending',
+          status: statusParam,
           startDate: dateStr,
           endDate: dateStr,
         });
@@ -66,7 +78,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
               : 'collection',
           total: o.finalTotal ?? o.total ?? 0,
           etaMins: o.estimatedTimeToComplete ?? 20,
-          status: 'new',
+          status: tab,
         }));
         setOrders(mapped);
       } catch (e: any) {
@@ -78,7 +90,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
       }
     };
     load();
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -115,14 +127,28 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     [orders, tab, typeFilter],
   );
 
-  const counts = useMemo(
-    () => ({
-      new: orders.filter(o => o.status === 'new').length,
-      inProgress: orders.filter(o => o.status === 'in-progress').length,
-      complete: orders.filter(o => o.status === 'complete').length,
-    }),
-    [orders],
-  );
+  const [counts, setCounts] = useState({ new: 0, inProgress: 0, complete: 0 });
+
+  useEffect(() => {
+    const computeCounts = async () => {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      try {
+        const allOrders = await fetchOrdersByDate(dateStr, dateStr);
+        setCounts({
+          new: allOrders.filter(o => o.status === 'pending').length,
+          inProgress: allOrders.filter(o => o.status === 'processing').length,
+          complete: allOrders.filter(o => o.status === 'completed').length,
+        });
+      } catch (e) {
+        // ignore counts error
+      }
+    };
+    computeCounts();
+  }, [tab]);
 
   // Map lightweight list item to detailed shape expected by OrderDetailScreen
   const toOrderDetail = (o: Order): OrderDetail => ({
@@ -140,7 +166,25 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   });
 
   const renderItem = ({ item }: { item: Order }) => (
-    <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={async () => {
+        try {
+          setDetailLoading(true);
+          setError('');
+          setSelected(item);
+          const branchId = (user as any)?.branch?.id || (user as any)?.branchId;
+          const full = await fetchOrderById(item.id, branchId);
+          setSelectedDetail(full);
+        } catch (e: any) {
+          setError(
+            e?.response?.data?.message || e?.message || 'Failed to load order',
+          );
+        } finally {
+          setDetailLoading(false);
+        }
+      }}
+    >
       <View style={{ flex: 1 }}>
         <Text style={styles.customer}>{item.customer}</Text>
         <Text style={styles.subtext}>
@@ -156,11 +200,14 @@ export default function LiveOrdersScreen({ onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      {selected ? (
+      {selectedDetail ? (
         <OrderDetailScreen
           stage={tab}
-          order={toOrderDetail(selected)}
-          onBack={() => setSelected(null)}
+          order={selectedDetail}
+          onBack={() => {
+            setSelected(null);
+            setSelectedDetail(null);
+          }}
         />
       ) : (
         <>
@@ -297,6 +344,10 @@ export default function LiveOrdersScreen({ onBack }: Props) {
           {loading ? (
             <View style={{ padding: 16 }}>
               <Text>Loading…</Text>
+            </View>
+          ) : detailLoading ? (
+            <View style={{ padding: 16 }}>
+              <Text>Loading order…</Text>
             </View>
           ) : (
             <FlatList
