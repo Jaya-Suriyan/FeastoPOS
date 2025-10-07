@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { printOrder } from '../services/printService';
 
 type Stage = 'new' | 'in-progress' | 'complete';
 
@@ -56,7 +57,14 @@ export default function OrderDetailScreen({
   onAcceptPress,
   onReadyPress,
 }: Props) {
-  const onPrint = () => Alert.alert('Print', 'Printing order...');
+  const onPrint = async () => {
+    try {
+      await printOrder(order);
+      Alert.alert('Print', 'Receipt sent to printer');
+    } catch (e: any) {
+      Alert.alert('Print error', e?.message || 'Failed to print');
+    }
+  };
   const onAccept = () =>
     onAcceptPress ? onAcceptPress() : Alert.alert('Accept', 'Order accepted');
   const onReject = () =>
