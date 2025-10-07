@@ -21,10 +21,12 @@ export interface FetchLiveOrdersParams {
   endDate: string; // YYYY-MM-DD
 }
 
-export async function fetchLiveOrders(params: FetchLiveOrdersParams): Promise<LiveOrder[]> {
+export async function fetchLiveOrders(
+  params: FetchLiveOrdersParams,
+): Promise<LiveOrder[]> {
   const res = await apiClient.get('/orders', { params });
   const data = res.data?.data ?? [];
-  return (data as any[]).map((o) => ({
+  return (data as any[]).map(o => ({
     ...o,
     id: o.id || o._id,
     orderNumber: o.orderNumber,
@@ -37,21 +39,36 @@ export async function fetchLiveOrders(params: FetchLiveOrdersParams): Promise<Li
     paymentStatus: o.paymentStatus,
     createdAt: o.createdAt,
     estimatedTimeToComplete: o.estimatedTimeToComplete,
-    user: o.user ? { firstName: o.user.firstName, lastName: o.user.lastName, email: o.user.email } : undefined,
+    user: o.user
+      ? {
+          firstName: o.user.firstName,
+          lastName: o.user.lastName,
+          email: o.user.email,
+        }
+      : undefined,
   }));
 }
 
-export async function fetchOrderById(id: string, branchId?: string): Promise<any> {
+export async function fetchOrderById(
+  id: string,
+  branchId?: string,
+): Promise<any> {
   const res = await apiClient.get(`/orders/${id}`, {
     params: branchId ? { branchId } : undefined,
   });
   return res.data?.data;
 }
 
-export async function fetchOrdersByDate(startDate: string, endDate: string): Promise<LiveOrder[]> {
-  const res = await apiClient.get('/orders', { params: { startDate, endDate } });
+export async function fetchOrdersByDate(
+  startDate: string,
+  endDate: string,
+  branchId?: string,
+): Promise<LiveOrder[]> {
+  const res = await apiClient.get('/orders', {
+    params: { startDate, endDate, ...(branchId ? { branchId } : {}) },
+  });
   const data = res.data?.data ?? [];
-  return (data as any[]).map((o) => ({
+  return (data as any[]).map(o => ({
     ...o,
     id: o.id || o._id,
     orderNumber: o.orderNumber,
@@ -64,8 +81,28 @@ export async function fetchOrdersByDate(startDate: string, endDate: string): Pro
     paymentStatus: o.paymentStatus,
     createdAt: o.createdAt,
     estimatedTimeToComplete: o.estimatedTimeToComplete,
-    user: o.user ? { firstName: o.user.firstName, lastName: o.user.lastName, email: o.user.email } : undefined,
+    user: o.user
+      ? {
+          firstName: o.user.firstName,
+          lastName: o.user.lastName,
+          email: o.user.email,
+        }
+      : undefined,
   }));
 }
 
+export async function updateOrderEstimatedTime(
+  id: string,
+  estimatedTimeToComplete: number,
+): Promise<any> {
+  const res = await apiClient.put(`/orders/${id}`, { estimatedTimeToComplete });
+  return res.data?.data ?? res.data;
+}
 
+export async function updateOrderStatus(
+  id: string,
+  status: string,
+): Promise<any> {
+  const res = await apiClient.put(`/orders/${id}`, { status });
+  return res.data?.data ?? res.data;
+}

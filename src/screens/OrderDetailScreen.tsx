@@ -41,15 +41,34 @@ interface Props {
   order: OrderDetail | any;
   stage: Stage;
   onBack: () => void;
+  onDelayPress?: () => void;
+  onCancelPress?: () => void;
+  onAcceptPress?: () => void;
+  onReadyPress?: () => void;
 }
 
-export default function OrderDetailScreen({ order, stage, onBack }: Props) {
+export default function OrderDetailScreen({
+  order,
+  stage,
+  onBack,
+  onDelayPress,
+  onCancelPress,
+  onAcceptPress,
+  onReadyPress,
+}: Props) {
   const onPrint = () => Alert.alert('Print', 'Printing order...');
-  const onAccept = () => Alert.alert('Accept', 'Order accepted');
-  const onReject = () => Alert.alert('Reject', 'Order rejected');
-  const onReady = () => Alert.alert('Ready', 'Order marked ready');
-  const onCancel = () => Alert.alert('Cancel', 'Order cancelled');
-  const onDelay = () => Alert.alert('Delay', 'Delay flow coming soon');
+  const onAccept = () =>
+    onAcceptPress ? onAcceptPress() : Alert.alert('Accept', 'Order accepted');
+  const onReject = () =>
+    onCancelPress ? onCancelPress() : Alert.alert('Reject', 'Order rejected');
+  const onReady = () =>
+    onReadyPress ? onReadyPress() : Alert.alert('Ready', 'Order marked ready');
+  const onCancel = () =>
+    onCancelPress ? onCancelPress() : Alert.alert('Cancel', 'Order cancelled');
+  const onDelay = () =>
+    onDelayPress
+      ? onDelayPress()
+      : Alert.alert('Delay', 'Delay flow coming soon');
 
   // Normalize items from order.items OR backend products[]
   const items = useMemo(() => {
@@ -497,11 +516,32 @@ const styles = StyleSheet.create({
   subtle: { color: '#6b7280' },
   totalRow: { borderTopWidth: 1, borderColor: '#e5e7eb' },
   total: { color: '#059669', fontWeight: '700' },
-  actions: { padding: 12, flexDirection: 'row', justifyContent: 'space-between', gap: 8, width: '100%' },
-  btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, width: '20%', alignItems: 'center' },
-  btnOutline: { borderWidth: 1, borderColor: '#6b7280', width: '20%', alignItems: 'center' },
+  actions: {
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    width: '20%',
+    alignItems: 'center',
+  },
+  btnOutline: {
+    borderWidth: 1,
+    borderColor: '#6b7280',
+    width: '20%',
+    alignItems: 'center',
+  },
   btnOutlineText: { color: '#374151', fontWeight: '600' },
-  btnPrimary: { backgroundColor: '#059669', width: '20%', alignItems: 'center' },
+  btnPrimary: {
+    backgroundColor: '#059669',
+    width: '20%',
+    alignItems: 'center',
+  },
   btnPrimaryText: { color: '#ffffff', fontWeight: '700' },
   btnDangerOutline: { borderColor: '#ef4444' },
   btnDangerOutlineText: { color: '#ef4444' },

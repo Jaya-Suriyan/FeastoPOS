@@ -8,11 +8,14 @@ import {
   FlatList,
   Animated,
   Easing,
+  Modal,
 } from 'react-native';
 import {
   fetchLiveOrders,
   fetchOrderById,
   fetchOrdersByDate,
+  updateOrderEstimatedTime,
+  updateOrderStatus,
 } from '../services/ordersService';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,54 +45,75 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [delayOpen, setDelayOpen] = useState(false);
+
+  const getTodayStr = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const refreshListForTab = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const dateStr = getTodayStr();
+      const statusParam =
+        tab === 'new'
+          ? 'pending'
+          : tab === 'in-progress'
+          ? 'processing'
+          : 'completed';
+      const apiOrders = await fetchLiveOrders({
+        status: statusParam,
+        startDate: dateStr,
+        endDate: dateStr,
+      });
+      const mapped: Order[] = apiOrders.map(o => ({
+        id: o.id,
+        customer:
+          o.user?.firstName || o.user?.lastName
+            ? `${o.user?.firstName ?? ''} ${o.user?.lastName ?? ''}`.trim()
+            : o.user?.email || 'Customer',
+        type:
+          o.orderType === 'delivery' || o.deliveryMethod === 'delivery'
+            ? 'delivery'
+            : 'collection',
+        total: o.finalTotal ?? o.total ?? 0,
+        etaMins: o.estimatedTimeToComplete ?? 20,
+        status: tab,
+      }));
+      setOrders(mapped);
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.message || e?.message || 'Failed to load orders',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshCounts = async () => {
+    try {
+      const dateStr = getTodayStr();
+      const branchId = (user as any)?.branch?.id || (user as any)?.branchId;
+      const allOrders = await fetchOrdersByDate(dateStr, dateStr, branchId);
+      setCounts({
+        new: allOrders.filter(o => o.status === 'pending').length,
+        inProgress: allOrders.filter(o => o.status === 'processing').length,
+        complete: allOrders.filter(o => o.status === 'completed').length,
+      });
+    } catch {}
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([refreshListForTab(), refreshCounts()]);
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        const statusParam =
-          tab === 'new'
-            ? 'pending'
-            : tab === 'in-progress'
-            ? 'processing'
-            : 'completed';
-        const apiOrders = await fetchLiveOrders({
-          status: statusParam,
-          startDate: dateStr,
-          endDate: dateStr,
-        });
-        console.log('apiOrders', apiOrders);
-        console.log('dateStr', dateStr);
-        const mapped: Order[] = apiOrders.map(o => ({
-          id: o.id,
-          customer:
-            o.user?.firstName || o.user?.lastName
-              ? `${o.user?.firstName ?? ''} ${o.user?.lastName ?? ''}`.trim()
-              : o.user?.email || 'Customer',
-          type:
-            o.orderType === 'delivery' || o.deliveryMethod === 'delivery'
-              ? 'delivery'
-              : 'collection',
-          total: o.finalTotal ?? o.total ?? 0,
-          etaMins: o.estimatedTimeToComplete ?? 20,
-          status: tab,
-        }));
-        setOrders(mapped);
-      } catch (e: any) {
-        setError(
-          e?.response?.data?.message || e?.message || 'Failed to load orders',
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    refreshAll();
   }, [tab]);
 
   useEffect(() => {
@@ -204,9 +228,100 @@ export default function LiveOrdersScreen({ onBack }: Props) {
         <OrderDetailScreen
           stage={tab}
           order={selectedDetail}
+          onDelayPress={() => setDelayOpen(true)}
+          onAcceptPress={async () => {
+            if (!selectedDetail) return;
+            try {
+              setDetailLoading(true);
+              await updateOrderStatus(selectedDetail.id, 'processing');
+              const branchId =
+                (user as any)?.branch?.id || (user as any)?.branchId;
+              const fresh = await fetchOrderById(selectedDetail.id, branchId);
+              setSelectedDetail(fresh);
+              await refreshAll();
+              setSelected(null);
+              setSelectedDetail(null);
+            } catch (e: any) {
+              setError(
+                e?.response?.data?.message ||
+                  e?.message ||
+                  'Failed to accept order',
+              );
+            } finally {
+              setDetailLoading(false);
+            }
+          }}
+          onReadyPress={async () => {
+            if (!selectedDetail) return;
+            try {
+              setDetailLoading(true);
+              await updateOrderStatus(selectedDetail.id, 'completed');
+              const branchId =
+                (user as any)?.branch?.id || (user as any)?.branchId;
+              const fresh = await fetchOrderById(selectedDetail.id, branchId);
+              setSelectedDetail(fresh);
+              await refreshAll();
+              setSelected(null);
+              setSelectedDetail(null);
+            } catch (e: any) {
+              setError(
+                e?.response?.data?.message ||
+                  e?.message ||
+                  'Failed to mark ready',
+              );
+            } finally {
+              setDetailLoading(false);
+            }
+          }}
+          onCancelPress={async () => {
+            if (!selectedDetail) return;
+            try {
+              setDetailLoading(true);
+              const confirmed = await new Promise<boolean>(resolve => {
+                // Use built-in Alert for confirmation
+                const RNAlert = require('react-native').Alert;
+                RNAlert.alert(
+                  'Cancel order',
+                  'Are you sure you want to cancel this order?',
+                  [
+                    {
+                      text: 'No',
+                      style: 'cancel',
+                      onPress: () => resolve(false),
+                    },
+                    {
+                      text: 'Yes, cancel',
+                      style: 'destructive',
+                      onPress: () => resolve(true),
+                    },
+                  ],
+                  { cancelable: true },
+                );
+              });
+              if (!confirmed) return;
+              await updateOrderStatus(selectedDetail.id, 'cancelled');
+              const branchId =
+                (user as any)?.branch?.id || (user as any)?.branchId;
+              const fresh = await fetchOrderById(selectedDetail.id, branchId);
+              setSelectedDetail(fresh);
+              await refreshAll();
+              // navigate back to list view after cancellation
+              setSelected(null);
+              setSelectedDetail(null);
+            } catch (e: any) {
+              setError(
+                e?.response?.data?.message ||
+                  e?.message ||
+                  'Failed to cancel order',
+              );
+            } finally {
+              setDetailLoading(false);
+            }
+          }}
           onBack={() => {
             setSelected(null);
             setSelectedDetail(null);
+            refreshAll();
           }}
         />
       ) : (
@@ -362,6 +477,103 @@ export default function LiveOrdersScreen({ onBack }: Props) {
           )}
         </>
       )}
+
+      {/* Delay modal */}
+      <Modal
+        visible={delayOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDelayOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              width: '88%',
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8 }}>
+              Delay this order
+            </Text>
+            <Text style={{ color: '#6b7280', marginBottom: 12 }}>
+              How much additional time do you want to add to the estimated time?
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                justifyContent: 'space-between',
+              }}
+            >
+              {[5, 10, 15, 20, 25, 30, 35, 40, 50].map(min => (
+                <TouchableOpacity
+                  key={min}
+                  style={{
+                    backgroundColor: '#10b981',
+                    paddingVertical: 12,
+                    borderRadius: 8,
+                    width: '30%',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                  onPress={async () => {
+                    if (!selectedDetail) return;
+                    try {
+                      setDetailLoading(true);
+                      const current = Number(
+                        selectedDetail?.estimatedTimeToComplete || 0,
+                      );
+                      const next = current + min;
+                      await updateOrderEstimatedTime(selectedDetail.id, next);
+                      const branchId =
+                        (user as any)?.branch?.id || (user as any)?.branchId;
+                      const fresh = await fetchOrderById(
+                        selectedDetail.id,
+                        branchId,
+                      );
+                      setSelectedDetail(fresh);
+                      await refreshAll();
+                      setDelayOpen(false);
+                    } catch (e: any) {
+                      setError(
+                        e?.response?.data?.message ||
+                          e?.message ||
+                          'Failed to update order',
+                      );
+                    } finally {
+                      setDetailLoading(false);
+                    }
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '700' }}>
+                    {min} mins
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={() => setDelayOpen(false)}
+              style={{
+                alignSelf: 'flex-end',
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
