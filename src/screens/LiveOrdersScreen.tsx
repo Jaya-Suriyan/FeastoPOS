@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import OrderDetailScreen, { OrderDetail } from './OrderDetailScreen';
 import {
   View,
   Text,
@@ -120,8 +121,25 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     [orders],
   );
 
+  const [selected, setSelected] = useState<Order | null>(null);
+
+  // Map lightweight list item to detailed shape expected by OrderDetailScreen
+  const toOrderDetail = (o: Order): OrderDetail => ({
+    id: o.id,
+    orderNumber: `DTB001-${o.id}`,
+    createdAt: new Date().toLocaleString(),
+    items: [{ id: 'x1', name: 'Set Meal', qty: 1, price: o.total }],
+    total: o.total,
+    type: o.type,
+    payment: {
+      method: 'card',
+      status: tab === 'complete' ? 'paid' : 'pending',
+    },
+    customer: { name: o.customer },
+  });
+
   const renderItem = ({ item }: { item: Order }) => (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
       <View style={{ flex: 1 }}>
         <Text style={styles.customer}>{item.customer}</Text>
         <Text style={styles.subtext}>
@@ -132,135 +150,152 @@ export default function LiveOrdersScreen({ onBack }: Props) {
         <Text style={styles.total}>£{item.total.toFixed(2)}</Text>
         <Text style={styles.eta}>• {item.etaMins} mins</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Live Orders</Text>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.menu}>Back</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.header}>
-        <Animated.Text
-          style={[
-            styles.liveDot,
-            {
-              opacity: pulse.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.4, 1],
-              }),
-            },
-          ]}
-        >
-          ● Online
-        </Animated.Text>
-      </View>
-      {/* Filters */}
-      <View style={styles.filtersRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            typeFilter === 'collection' && styles.filterChipActive,
-          ]}
-          onPress={() =>
-            setTypeFilter(prev =>
-              prev === 'collection' ? 'all' : 'collection',
-            )
-          }
-        >
-          <Text
-            style={[
-              styles.filterText,
-              typeFilter === 'collection' && styles.filterTextActive,
-            ]}
-          >
-            Collection
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            typeFilter === 'delivery' && styles.filterChipActive,
-          ]}
-          onPress={() =>
-            setTypeFilter(prev => (prev === 'delivery' ? 'all' : 'delivery'))
-          }
-        >
-          <Text
-            style={[
-              styles.filterText,
-              typeFilter === 'delivery' && styles.filterTextActive,
-            ]}
-          >
-            Delivery
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            typeFilter === 'table' && styles.filterChipActive,
-          ]}
-          onPress={() =>
-            setTypeFilter(prev => (prev === 'table' ? 'all' : 'table'))
-          }
-        >
-          <Text
-            style={[
-              styles.filterText,
-              typeFilter === 'table' && styles.filterTextActive,
-            ]}
-          >
-            Table Ordering
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {selected ? (
+        <OrderDetailScreen
+          stage={tab}
+          order={toOrderDetail(selected)}
+          onBack={() => setSelected(null)}
+        />
+      ) : (
+        <>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Live Orders</Text>
+            <TouchableOpacity onPress={onBack}>
+              <Text style={styles.menu}>Back</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.header}>
+            <Animated.Text
+              style={[
+                styles.liveDot,
+                {
+                  opacity: pulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.4, 1],
+                  }),
+                },
+              ]}
+            >
+              ● Online
+            </Animated.Text>
+          </View>
+          {/* Filters */}
+          <View style={styles.filtersRow}>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                typeFilter === 'collection' && styles.filterChipActive,
+              ]}
+              onPress={() =>
+                setTypeFilter(prev =>
+                  prev === 'collection' ? 'all' : 'collection',
+                )
+              }
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  typeFilter === 'collection' && styles.filterTextActive,
+                ]}
+              >
+                Collection
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                typeFilter === 'delivery' && styles.filterChipActive,
+              ]}
+              onPress={() =>
+                setTypeFilter(prev =>
+                  prev === 'delivery' ? 'all' : 'delivery',
+                )
+              }
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  typeFilter === 'delivery' && styles.filterTextActive,
+                ]}
+              >
+                Delivery
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                typeFilter === 'table' && styles.filterChipActive,
+              ]}
+              onPress={() =>
+                setTypeFilter(prev => (prev === 'table' ? 'all' : 'table'))
+              }
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  typeFilter === 'table' && styles.filterTextActive,
+                ]}
+              >
+                Table Ordering
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'new' && styles.tabActive]}
-          onPress={() => setTab('new')}
-        >
-          <Text style={[styles.tabText, tab === 'new' && styles.tabTextActive]}>
-            New ({counts.new})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'in-progress' && styles.tabActive]}
-          onPress={() => setTab('in-progress')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              tab === 'in-progress' && styles.tabTextActive,
-            ]}
-          >
-            In Progress ({counts.inProgress})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'complete' && styles.tabActive]}
-          onPress={() => setTab('complete')}
-        >
-          <Text
-            style={[styles.tabText, tab === 'complete' && styles.tabTextActive]}
-          >
-            Complete ({counts.complete})
-          </Text>
-        </TouchableOpacity>
-      </View>
+          {/* Tabs */}
+          <View style={styles.tabs}>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'new' && styles.tabActive]}
+              onPress={() => setTab('new')}
+            >
+              <Text
+                style={[styles.tabText, tab === 'new' && styles.tabTextActive]}
+              >
+                New ({counts.new})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'in-progress' && styles.tabActive]}
+              onPress={() => setTab('in-progress')}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === 'in-progress' && styles.tabTextActive,
+                ]}
+              >
+                In Progress ({counts.inProgress})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'complete' && styles.tabActive]}
+              onPress={() => setTab('complete')}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === 'complete' && styles.tabTextActive,
+                ]}
+              >
+                Complete ({counts.complete})
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={it => it.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16 }}
-      />
+          {/* List */}
+          <FlatList
+            data={filtered}
+            keyExtractor={it => it.id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16 }}
+          />
+        </>
+      )}
     </View>
   );
 }
