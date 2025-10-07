@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   onLogin: () => void;
@@ -9,14 +17,25 @@ export default function LoginScreen({ onLogin }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!email || !password) {
       setError('Enter email and password');
       return;
     }
-    // TODO: integrate real auth
-    onLogin();
+    try {
+      setError('');
+      setLoading(true);
+      await login(email.trim(), password);
+      onLogin();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Login failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,8 +57,16 @@ export default function LoginScreen({ onLogin }: Props) {
         style={styles.input}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <TouchableOpacity onPress={handleSubmit} style={styles.button}>
-        <Text style={styles.buttonText}>Login</Text>
+      <TouchableOpacity
+        onPress={handleSubmit}
+        style={styles.button}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.buttonText}>Login</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -84,5 +111,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
-

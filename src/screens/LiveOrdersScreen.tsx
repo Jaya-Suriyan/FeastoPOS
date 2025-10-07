@@ -9,6 +9,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { fetchLiveOrders } from '../services/ordersService';
+import { useAuth } from '../context/AuthContext';
 
 type Order = {
   id: string;
@@ -30,51 +32,52 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   const [typeFilter, setTypeFilter] = useState<
     'all' | 'collection' | 'delivery' | 'table'
   >('all');
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<Order | null>(null);
 
   useEffect(() => {
-    // TODO: replace with socket/api feed
-    setOrders([
-      {
-        id: '1',
-        customer: 'Sachin T',
-        type: 'collection',
-        total: 55.0,
-        etaMins: 20,
-        status: 'new',
-      },
-      {
-        id: '2',
-        customer: 'MSD J',
-        type: 'collection',
-        total: 55.0,
-        etaMins: 20,
-        status: 'new',
-      },
-      {
-        id: '3',
-        customer: 'df feg',
-        type: 'collection',
-        total: 15.9,
-        etaMins: 20,
-        status: 'new',
-      },
-      {
-        id: '4',
-        customer: 'fd dgd',
-        type: 'delivery',
-        total: 19.95,
-        etaMins: 45,
-        status: 'new',
-      },
-      {
-        id: '5',
-        customer: 'ggd dfgfg',
-        type: 'delivery',
-        total: 22.95,
-        etaMins: 45,
-        status: 'new',
-      },
-    ]);
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+        const apiOrders = await fetchLiveOrders({
+          status: 'pending',
+          startDate: dateStr,
+          endDate: dateStr,
+        });
+        console.log('apiOrders', apiOrders);
+        console.log('dateStr', dateStr);
+        const mapped: Order[] = apiOrders.map(o => ({
+          id: o.id,
+          customer:
+            o.user?.firstName || o.user?.lastName
+              ? `${o.user?.firstName ?? ''} ${o.user?.lastName ?? ''}`.trim()
+              : o.user?.email || 'Customer',
+          type:
+            o.orderType === 'delivery' || o.deliveryMethod === 'delivery'
+              ? 'delivery'
+              : 'collection',
+          total: o.finalTotal ?? o.total ?? 0,
+          etaMins: o.estimatedTimeToComplete ?? 20,
+          status: 'new',
+        }));
+        setOrders(mapped);
+      } catch (e: any) {
+        setError(
+          e?.response?.data?.message || e?.message || 'Failed to load orders',
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   useEffect(() => {
@@ -120,8 +123,6 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     }),
     [orders],
   );
-
-  const [selected, setSelected] = useState<Order | null>(null);
 
   // Map lightweight list item to detailed shape expected by OrderDetailScreen
   const toOrderDetail = (o: Order): OrderDetail => ({
@@ -185,6 +186,11 @@ export default function LiveOrdersScreen({ onBack }: Props) {
               ● Online
             </Animated.Text>
           </View>
+          {!!error && (
+            <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Text style={{ color: '#ef4444' }}>{error}</Text>
+            </View>
+          )}
           {/* Filters */}
           <View style={styles.filtersRow}>
             <TouchableOpacity
@@ -288,12 +294,21 @@ export default function LiveOrdersScreen({ onBack }: Props) {
           </View>
 
           {/* List */}
-          <FlatList
-            data={filtered}
-            keyExtractor={it => it.id}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 16 }}
-          />
+          {loading ? (
+            <View style={{ padding: 16 }}>
+              <Text>Loading…</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={it => it.id}
+              renderItem={renderItem}
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                paddingBottom: 16,
+              }}
+            />
+          )}
         </>
       )}
     </View>

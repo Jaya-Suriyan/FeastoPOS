@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   onLogout: () => void;
@@ -7,6 +8,12 @@ interface Props {
 }
 
 export default function DashboardScreen({ onLogout, onLiveOrders }: Props) {
+  const { user } = useAuth();
+  const displayName =
+    user?.firstName || user?.lastName
+      ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
+      : user?.email ?? '';
+  const branchName = user?.branch?.name || '';
   const handleLiveOrders = () => {
     onLiveOrders && onLiveOrders();
   };
@@ -18,12 +25,25 @@ export default function DashboardScreen({ onLogout, onLiveOrders }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Dashboard</Text>
+      {!!displayName || !!branchName ? (
+        <Text style={styles.subtitle}>
+          {displayName}
+          {displayName && branchName ? ' — ' : ''}
+          {branchName}
+        </Text>
+      ) : null}
       <View style={styles.row}>
-        <TouchableOpacity style={[styles.card, styles.primary]} onPress={handleLiveOrders}>
+        <TouchableOpacity
+          style={[styles.card, styles.primary]}
+          onPress={handleLiveOrders}
+        >
           <Text style={styles.cardTitle}>Live Orders</Text>
           <Text style={styles.cardText}>View current orders</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.card, styles.secondary]} onPress={handleRecords}>
+        <TouchableOpacity
+          style={[styles.card, styles.secondary]}
+          onPress={handleRecords}
+        >
           <Text style={styles.cardTitle}>Records</Text>
           <Text style={styles.cardText}>Order history</Text>
         </TouchableOpacity>
@@ -46,6 +66,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     color: '#111827',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#374151',
+    marginTop: -8,
+    marginBottom: 16,
   },
   row: {
     flexDirection: 'row',
@@ -84,5 +110,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-
