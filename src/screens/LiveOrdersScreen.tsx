@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import OrderDetailScreen, { OrderDetail } from './OrderDetailScreen';
 import {
   View,
@@ -18,6 +24,7 @@ import {
   updateOrderStatus,
 } from '../services/ordersService';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 type Order = {
   id: string;
@@ -40,6 +47,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     'all' | 'collection' | 'delivery' | 'table'
   >('all');
   const { user } = useAuth();
+  const { onOrderEvent, offOrderEvent, isConnected } = useSocket();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
@@ -137,6 +145,21 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     return () => loop.stop();
   }, [pulse]);
 
+  // Subscribe to socket order events
+  const handleOrderEvent = useCallback(
+    (message: any) => {
+      // Minimal: refresh lists and counts on any order change
+      console.log('handleOrderEvent', message);
+      refreshAll();
+    },
+    [refreshAll],
+  );
+
+  useEffect(() => {
+    onOrderEvent(handleOrderEvent);
+    return () => offOrderEvent(handleOrderEvent);
+  }, [onOrderEvent, offOrderEvent, handleOrderEvent]);
+
   const filtered = useMemo(
     () =>
       orders
@@ -173,21 +196,6 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     };
     computeCounts();
   }, [tab]);
-
-  // Map lightweight list item to detailed shape expected by OrderDetailScreen
-  const toOrderDetail = (o: Order): OrderDetail => ({
-    id: o.id,
-    orderNumber: `DTB001-${o.id}`,
-    createdAt: new Date().toLocaleString(),
-    items: [{ id: 'x1', name: 'Set Meal', qty: 1, price: o.total }],
-    total: o.total,
-    type: o.type,
-    payment: {
-      method: 'card',
-      status: tab === 'complete' ? 'paid' : 'pending',
-    },
-    customer: { name: o.customer },
-  });
 
   const renderItem = ({ item }: { item: Order }) => (
     <TouchableOpacity
@@ -338,14 +346,17 @@ export default function LiveOrdersScreen({ onBack }: Props) {
               style={[
                 styles.liveDot,
                 {
-                  opacity: pulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.4, 1],
-                  }),
+                  color: isConnected ? '#16a34a' : '#ef4444',
+                  opacity: isConnected
+                    ? pulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.4, 1],
+                      })
+                    : 1,
                 },
               ]}
             >
-              ● Online
+              ● {isConnected ? 'Online' : 'Offline'}
             </Animated.Text>
           </View>
           {!!error && (
