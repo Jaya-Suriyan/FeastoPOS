@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
@@ -22,6 +23,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const connectedRef = useRef<boolean>(false);
+  const [connectedState, setConnectedState] = useState<boolean>(false);
   const handlersRef = useRef<Set<OrderEventHandler>>(new Set());
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         socketRef.current = null;
       }
       connectedRef.current = false;
+      setConnectedState(false);
       return;
     }
 
@@ -53,10 +56,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const onConnect = () => {
       console.log('Socket connected');
       connectedRef.current = true;
+      setConnectedState(true);
     };
     const onDisconnect = () => {
       console.log('Socket disconnected');
       connectedRef.current = false;
+      setConnectedState(false);
     };
 
     socket.on('connect', onConnect);
@@ -85,15 +90,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       } catch {}
       socketRef.current = null;
       connectedRef.current = false;
+      setConnectedState(false);
     };
   }, [token]);
 
   const value = useMemo<SocketContextType>(
     () =>
       ({
-        get isConnected() {
-          return connectedRef.current;
-        },
+        isConnected: connectedState,
         onOrderEvent: (handler: OrderEventHandler) => {
           handlersRef.current.add(handler);
         },
@@ -101,7 +105,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
           handlersRef.current.delete(handler);
         },
       } as any),
-    [],
+    [connectedState],
   );
 
   return (

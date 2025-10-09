@@ -63,10 +63,10 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const refreshListForTab = async () => {
+  const refreshListForTab = async (silent?: boolean) => {
     try {
-      setLoading(true);
-      setError('');
+      if (!silent) setLoading(true);
+      if (!silent) setError('');
       const dateStr = getTodayStr();
       const statusParam =
         tab === 'new'
@@ -95,11 +95,13 @@ export default function LiveOrdersScreen({ onBack }: Props) {
       }));
       setOrders(mapped);
     } catch (e: any) {
-      setError(
-        e?.response?.data?.message || e?.message || 'Failed to load orders',
-      );
+      if (!silent) {
+        setError(
+          e?.response?.data?.message || e?.message || 'Failed to load orders',
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -116,8 +118,8 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     } catch {}
   };
 
-  const refreshAll = async () => {
-    await Promise.all([refreshListForTab(), refreshCounts()]);
+  const refreshAll = async (silent?: boolean) => {
+    await Promise.all([refreshListForTab(silent), refreshCounts()]);
   };
 
   useEffect(() => {
@@ -148,9 +150,9 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   // Subscribe to socket order events
   const handleOrderEvent = useCallback(
     (message: any) => {
-      // Minimal: refresh lists and counts on any order change
+      // Silent refresh on socket updates
       console.log('handleOrderEvent', message);
-      refreshAll();
+      refreshAll(true);
     },
     [refreshAll],
   );
