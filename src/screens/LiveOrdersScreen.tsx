@@ -25,6 +25,7 @@ import {
 } from '../services/ordersService';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { playNewOrderSound } from '../utils/sound';
 
 type Order = {
   id: string;
@@ -152,6 +153,15 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     (message: any) => {
       // Silent refresh on socket updates
       console.log('handleOrderEvent', message);
+      try {
+        if (
+          message?.event === 'order_created' ||
+          message?.type === 'order_created' ||
+          message === 'order_created'
+        ) {
+          playNewOrderSound();
+        }
+      } catch {}
       refreshAll(true);
     },
     [refreshAll],
