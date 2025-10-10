@@ -47,6 +47,9 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   const [typeFilter, setTypeFilter] = useState<
     'all' | 'collection' | 'delivery' | 'table'
   >('all');
+  // 0 = Today, 1 = Yesterday, 2 = Two days ago
+  const [dateOffset, setDateOffset] = useState<0 | 1 | 2>(0);
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const { user } = useAuth();
   const { onOrderEvent, offOrderEvent, isConnected } = useSocket();
   const [loading, setLoading] = useState(false);
@@ -56,11 +59,12 @@ export default function LiveOrdersScreen({ onBack }: Props) {
   const [selected, setSelected] = useState<Order | null>(null);
   const [delayOpen, setDelayOpen] = useState(false);
 
-  const getTodayStr = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+  const getDateStr = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
@@ -68,7 +72,8 @@ export default function LiveOrdersScreen({ onBack }: Props) {
     try {
       if (!silent) setLoading(true);
       if (!silent) setError('');
-      const dateStr = getTodayStr();
+      const dateStr = getDateStr(dateOffset);
+      const endDateStr = getDateStr(0);
       const statusParam =
         tab === 'new'
           ? 'pending'
@@ -78,7 +83,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
       const apiOrders = await fetchLiveOrders({
         status: statusParam,
         startDate: dateStr,
-        endDate: dateStr,
+        endDate: endDateStr,
       });
       const mapped: Order[] = apiOrders.map(o => ({
         id: o.id,
@@ -108,9 +113,10 @@ export default function LiveOrdersScreen({ onBack }: Props) {
 
   const refreshCounts = async () => {
     try {
-      const dateStr = getTodayStr();
+      const dateStr = getDateStr(dateOffset);
+      const endDateStr = getDateStr(0);
       const branchId = (user as any)?.branch?.id || (user as any)?.branchId;
-      const allOrders = await fetchOrdersByDate(dateStr, dateStr, branchId);
+      const allOrders = await fetchOrdersByDate(dateStr, endDateStr, branchId);
       setCounts({
         new: allOrders.filter(o => o.status === 'pending').length,
         inProgress: allOrders.filter(o => o.status === 'processing').length,
@@ -125,7 +131,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
 
   useEffect(() => {
     refreshAll();
-  }, [tab]);
+  }, [tab, dateOffset]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -190,17 +196,12 @@ export default function LiveOrdersScreen({ onBack }: Props) {
 
   useEffect(() => {
     const computeCounts = async () => {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dateStr = getDateStr(dateOffset);
+      const endDateStr = getDateStr(0);
       try {
-        const allOrders = await fetchOrdersByDate(dateStr, dateStr);
+        const allOrders = await fetchOrdersByDate(dateStr, endDateStr);
         const filteredOrders = allOrders.filter(o =>
-          typeFilter === 'all'
-            ? true
-            : o.orderType === typeFilter,
+          typeFilter === 'all' ? true : o.orderType === typeFilter,
         );
         setCounts({
           new: filteredOrders.filter(o => o.status === 'pending').length,
@@ -213,7 +214,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
       }
     };
     computeCounts();
-  }, [tab, typeFilter]);
+  }, [tab, typeFilter, dateOffset]);
 
   const renderItem = ({ item }: { item: Order }) => (
     <TouchableOpacity
@@ -355,6 +356,29 @@ export default function LiveOrdersScreen({ onBack }: Props) {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Live Orders</Text>
+            {/* Date dropdown */}
+            <View>
+              <TouchableOpacity
+                onPress={() => setDateMenuOpen(true)}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  marginRight: 8,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: '#111827' }}>
+                  Start From:{' '}
+                  {dateOffset === 0
+                    ? 'Today'
+                    : dateOffset === 1
+                    ? 'Yesterday'
+                    : 'Two days ago'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity onPress={onBack}>
               <Text style={styles.menu}>Back</Text>
             </TouchableOpacity>
@@ -600,6 +624,59 @@ export default function LiveOrdersScreen({ onBack }: Props) {
             >
               <Text>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date dropdown modal */}
+      <Modal
+        visible={dateMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDateMenuOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              width: '80%',
+              borderRadius: 12,
+              paddingVertical: 8,
+            }}
+          >
+            {[
+              { label: 'Today', value: 0 },
+              { label: 'Yesterday', value: 1 },
+              { label: 'Two days ago', value: 2 },
+            ].map(opt => (
+              <TouchableOpacity
+                key={String(opt.value)}
+                onPress={() => {
+                  setDateOffset(opt.value as 0 | 1 | 2);
+                  setDateMenuOpen(false);
+                }}
+                style={{ paddingVertical: 12, paddingHorizontal: 16 }}
+              >
+                <Text
+                  style={{
+                    color: opt.value === dateOffset ? '#111827' : '#374151',
+                    fontWeight:
+                      opt.value === dateOffset
+                        ? ('700' as any)
+                        : ('400' as any),
+                  }}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </Modal>
