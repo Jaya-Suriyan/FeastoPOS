@@ -197,17 +197,23 @@ export default function LiveOrdersScreen({ onBack }: Props) {
       const dateStr = `${yyyy}-${mm}-${dd}`;
       try {
         const allOrders = await fetchOrdersByDate(dateStr, dateStr);
+        const filteredOrders = allOrders.filter(o =>
+          typeFilter === 'all'
+            ? true
+            : o.orderType === typeFilter,
+        );
         setCounts({
-          new: allOrders.filter(o => o.status === 'pending').length,
-          inProgress: allOrders.filter(o => o.status === 'processing').length,
-          complete: allOrders.filter(o => o.status === 'completed').length,
+          new: filteredOrders.filter(o => o.status === 'pending').length,
+          inProgress: filteredOrders.filter(o => o.status === 'processing')
+            .length,
+          complete: filteredOrders.filter(o => o.status === 'completed').length,
         });
       } catch (e) {
         // ignore counts error
       }
     };
     computeCounts();
-  }, [tab]);
+  }, [tab, typeFilter]);
 
   const renderItem = ({ item }: { item: Order }) => (
     <TouchableOpacity

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,6 +41,13 @@ export default function LoginScreen({ onLogin }: Props) {
 
   return (
     <View style={styles.container}>
+      <View style={styles.bannerContainer}>
+        <Image
+          source={require('./rasoie_logo.jpg')}
+          style={styles.bannerImage}
+          resizeMode="contain"
+        />
+      </View>
       <Text style={styles.title}>Sign in</Text>
       <TextInput
         placeholder="Email"
@@ -78,6 +86,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     justifyContent: 'center',
     backgroundColor: '#ffffff',
+  },
+  bannerContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingTop: 10,
+  },
+  bannerImage: {
+    width: 300,
+    height: 220,
   },
   title: {
     fontSize: 24,
