@@ -5,9 +5,14 @@ import { useAuth } from '../context/AuthContext';
 interface Props {
   onLogout: () => void;
   onLiveOrders?: () => void;
+  onHistory?: () => void;
 }
 
-export default function DashboardScreen({ onLogout, onLiveOrders }: Props) {
+export default function DashboardScreen({
+  onLogout,
+  onLiveOrders,
+  onHistory,
+}: Props) {
   const { user } = useAuth();
   const displayName =
     user?.firstName || user?.lastName
@@ -19,7 +24,7 @@ export default function DashboardScreen({ onLogout, onLiveOrders }: Props) {
   };
 
   const handleRecords = () => {
-    // TODO: navigate to Records/Reports screen
+    onHistory && onHistory();
   };
 
   return (

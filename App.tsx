@@ -15,6 +15,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import LiveOrdersScreen from './src/screens/LiveOrdersScreen';
+import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketContext';
 
@@ -37,7 +38,7 @@ function AppContent() {
   const safeAreaInsets = useSafeAreaInsets();
   const [isSplash, setIsSplash] = useState(true);
   const { isAuthenticated, logout } = useAuth();
-  const [screen, setScreen] = useState<'dashboard' | 'liveOrders'>('dashboard');
+  const [screen, setScreen] = useState<'dashboard' | 'liveOrders' | 'history'>('dashboard');
 
   useEffect(() => {
     const t = setTimeout(() => setIsSplash(false), 1500);
@@ -62,9 +63,12 @@ function AppContent() {
         <DashboardScreen
           onLogout={() => logout()}
           onLiveOrders={() => setScreen('liveOrders')}
+          onHistory={() => setScreen('history')}
         />
-      ) : (
+      ) : screen === 'liveOrders' ? (
         <LiveOrdersScreen onBack={() => setScreen('dashboard')} />
+      ) : (
+        <OrderHistoryScreen onBack={() => setScreen('dashboard')} />
       )}
     </View>
   );
