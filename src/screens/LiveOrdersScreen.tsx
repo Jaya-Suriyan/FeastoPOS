@@ -15,6 +15,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   fetchLiveOrders,
@@ -26,6 +27,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { playNewOrderSound } from '../utils/sound';
+import { printOrder } from '../services/printService';
 
 type Order = {
   id: string;
@@ -194,6 +196,15 @@ export default function LiveOrdersScreen({ onBack }: Props) {
 
   const [counts, setCounts] = useState({ new: 0, inProgress: 0, complete: 0 });
 
+  const onPrint = async (order: OrderDetail) => {
+    try {
+      await printOrder(order as any);
+      Alert.alert('Print', 'Receipt sent to printer');
+    } catch (e: any) {
+      Alert.alert('Print error', e?.message || 'Failed to print');
+    }
+  };
+
   useEffect(() => {
     const computeCounts = async () => {
       const dateStr = getDateStr(dateOffset);
@@ -266,6 +277,7 @@ export default function LiveOrdersScreen({ onBack }: Props) {
               const fresh = await fetchOrderById(selectedDetail.id, branchId);
               setSelectedDetail(fresh);
               await refreshAll();
+              onPrint(selectedDetail);
               setSelected(null);
               setSelectedDetail(null);
             } catch (e: any) {
